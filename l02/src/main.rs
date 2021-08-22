@@ -335,7 +335,7 @@ impl Iterator for Tokenizer<'_> {
 // 语法分析
 // 包括了AST的数据结构和递归下降的语法解析程序
 
-use l01::{DecodeError, Dumper, FunctionBody, FunctionCall, FunctionDecl, Prog, Statement};
+use l01::{Dumper, FunctionBody, FunctionCall, FunctionDecl, Prog, Statement};
 
 struct Parser<'a> {
     tokenizer: Peekable<Tokenizer<'a>>,
@@ -467,6 +467,10 @@ impl Parser<'_> {
 }
 
 /////////////////////////////////////////////////////////////////////////
+// 语义分析
+use l01::{Interpreter, RefResolver};
+
+/////////////////////////////////////////////////////////////////////////
 // 主程序
 fn compile_and_run(code: &str) {
     // 词法分析（模拟）
@@ -484,14 +488,14 @@ fn compile_and_run(code: &str) {
     println!("\n语法分析后的AST:");
     prog.dump("");
 
-    // // 语义分析
-    // RefResolver::resolve(&mut prog)?;
-    // println!("\n语义分析后的AST:");
-    // prog.dump("");
-    //
-    // // 运行程序
-    // println!("\n运行程序");
-    // Interpreter::run(&prog)?;
+    // 语义分析
+    RefResolver::resolve(&mut prog).unwrap();
+    println!("\n语义分析后的AST:");
+    prog.dump("");
+
+    // 运行程序
+    println!("\n运行程序");
+    Interpreter::run(&prog).unwrap();
 }
 
 const DEFAULT_CODE: &str = include_str!("default.ps");

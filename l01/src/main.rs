@@ -1,8 +1,6 @@
 #[macro_use]
 extern crate derive_new;
 
-use std::collections::HashMap;
-
 /**
  * 第1节
  * 本节的目的是迅速的实现一个最精简的语言的功能，让你了解一门计算机语言的骨架。
@@ -245,85 +243,7 @@ impl Parser {
 
 /////////////////////////////////////////////////////////////////////////
 // 语义分析
-
-// // 对AST做遍历的 Vistor
-// // 实现可以覆盖某些方法以修改遍历方式
-// trait AstVisitor {
-//     fn visit_prog(&mut self, prog: &mut Prog) {
-//         for x in &mut prog.stmts {
-//             match x {
-//                 Statement::FunctionDecl(x) => self.visit_function_decl(prog, x),
-//                 Statement::FunctionCall(x) => self.visit_function_call(prog, x),
-//             }
-//         }
-//     }
-//
-//     fn visit_function_decl(&mut self, prog: &mut Prog, decl: &mut FunctionDecl) {
-//         for x in &mut decl.body.stmts {
-//             self.visit_function_call(prog, x);
-//         }
-//     }
-//
-//     fn visit_function_call(&mut self, prog: &mut Prog, call: &mut FunctionCall) {}
-// }
-
-struct RefResolver {}
-impl RefResolver {
-    fn resolve(prog: &mut Prog) -> Result<(), String> {
-        let mut functions: HashMap<String, std::ptr::NonNull<FunctionDecl>> = HashMap::new();
-
-        for x in &mut prog.stmts {
-            match x {
-                Statement::FunctionDecl(decl) => {
-                    functions.insert(decl.name.to_string(), decl.into());
-                }
-                Statement::FunctionCall(call) => match functions.get(&call.name) {
-                    None => match call.name.as_ref() {
-                        "println" => {}
-                        _ => return Err(format!("unkown name {}", call.name)),
-                    },
-                    Some(ptr) => call.definition = Some(ptr.clone()),
-                },
-            }
-        }
-
-        Ok(())
-    }
-}
-
-struct Interpreter {}
-
-impl Interpreter {
-    fn run(prog: &Prog) -> Result<(), String> {
-        for x in &prog.stmts {
-            if let Statement::FunctionCall(call) = x {
-                Interpreter::run_call(call)?
-            }
-        }
-
-        Ok(())
-    }
-
-    fn run_call(call: &FunctionCall) -> Result<(), String> {
-        match call.definition {
-            None => {
-                if call.name == "println" {
-                    println!("{}", call.parameters.join(" "));
-                    Ok(())
-                } else {
-                    Err(format!("Unknown function {}", call.name))
-                }
-            }
-            Some(def) => {
-                for x in &{ unsafe { def.as_ref() } }.body.stmts {
-                    Interpreter::run_call(x)?
-                }
-
-                Ok(())
-            }
-        }
-    }
-}
+use l01::{Interpreter, RefResolver};
 
 /////////////////////////////////////////////////////////////////////////
 // 主程序
