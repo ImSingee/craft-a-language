@@ -1,17 +1,9 @@
-#[derive(Debug, PartialEq, Eq)]
-#[allow(unused)]
-pub enum TokenKind {
-    Keyword,
-    Identifier,
-    StringLiteral,
-    Seperator,
-    Operator,
-    EOF,
-}
+pub mod error;
+pub mod grammar;
+pub mod prog;
+pub mod token;
 
-// 代表一个Token的数据结构
-#[derive(Debug)]
-pub struct Token {
-    pub kind: TokenKind,
-    pub text: String,
-}
+pub use error::DecodeError;
+pub use grammar::{Dumper, FunctionBody, FunctionCall, FunctionDecl, Statement};
+pub use prog::Prog;
+pub use token::{Token, TokenKind};

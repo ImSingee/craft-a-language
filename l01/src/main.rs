@@ -2,8 +2,6 @@
 extern crate derive_new;
 
 use std::collections::HashMap;
-use std::fmt::Formatter;
-use std::ptr::NonNull;
 
 /**
  * 第1节
@@ -20,39 +18,14 @@ use std::ptr::NonNull;
  * functionCall : Identifier '(' parameterList? ')' ;
  * parameterList : StringLiteral (',' StringLiteral)* ;
  */
-
 /////////////////////////////////////////////////////////////////////////
 // 错误处理
-
-#[derive(Debug)]
-enum DecodeError {
-    TryNext,
-    Fatal(String),
-}
-impl std::fmt::Display for DecodeError {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        match self {
-            DecodeError::TryNext => write!(f, "Please try next method"),
-            DecodeError::Fatal(message) => write!(f, "{}", message),
-        }
-    }
-}
-impl From<&str> for DecodeError {
-    fn from(message: &str) -> Self {
-        DecodeError::Fatal(message.to_string())
-    }
-}
-impl From<String> for DecodeError {
-    fn from(message: String) -> Self {
-        DecodeError::Fatal(message)
-    }
-}
+use l01::DecodeError;
 
 /////////////////////////////////////////////////////////////////////////
 // 词法分析
 // 本节没有提供词法分析器，直接提供了一个Token串。语法分析程序可以从Token串中依次读出
 // 一个个Token，也可以重新定位Token串的当前读取位置。
-
 use l01::{Token, TokenKind};
 
 struct Tokenizer {
@@ -111,105 +84,7 @@ impl Tokenizer {
 // 语法分析
 // 包括了AST的数据结构和递归下降的语法解析程序
 
-trait Dumper {
-    //打印对象信息，prefix是前面填充的字符串，通常用于缩进显示
-    fn dump(&self, prefix: &str);
-}
-
-enum Statement {
-    FunctionDecl(FunctionDecl),
-    FunctionCall(FunctionCall),
-}
-impl Dumper for Statement {
-    fn dump(&self, prefix: &str) {
-        match self {
-            Statement::FunctionDecl(x) => x.dump(prefix),
-            Statement::FunctionCall(x) => x.dump(prefix),
-        }
-    }
-}
-
-/**
- * 程序节点，也是AST的根节点
- */
-#[derive(new)]
-struct Prog {
-    stmts: Vec<Statement>, //程序中可以包含多个语句
-}
-impl Dumper for Prog {
-    fn dump(&self, prefix: &str) {
-        println!("{}Prog", prefix);
-        for x in &self.stmts {
-            x.dump(&(prefix.to_string() + "\t"))
-        }
-    }
-}
-
-/**
- * 函数声明节点
- */
-#[derive(new)]
-struct FunctionDecl {
-    name: String,       //函数名称
-    body: FunctionBody, //函数体
-}
-impl Dumper for FunctionDecl {
-    fn dump(&self, prefix: &str) {
-        println!("{}FunctionDecl {}", prefix, self.name);
-        self.body.dump(&(prefix.to_string() + "\t"));
-    }
-}
-
-/**
- * 函数体
- */
-#[derive(new)]
-struct FunctionBody {
-    stmts: Vec<FunctionCall>,
-}
-impl Dumper for FunctionBody {
-    fn dump(&self, prefix: &str) {
-        println!("{}FunctionBody", prefix);
-        for x in &self.stmts {
-            x.dump(&*format!("{}\t", prefix))
-        }
-    }
-}
-
-/**
- * 函数调用
- */
-struct FunctionCall {
-    name: String,
-    parameters: Vec<String>,
-    definition: Option<NonNull<FunctionDecl>>, // 指向函数的声明
-}
-impl FunctionCall {
-    fn new(name: String, parameters: Vec<String>) -> FunctionCall {
-        FunctionCall {
-            name,
-            parameters,
-            definition: None,
-        }
-    }
-}
-impl Dumper for FunctionCall {
-    fn dump(&self, prefix: &str) {
-        println!(
-            "{}FunctionCall {}, {}",
-            prefix,
-            self.name,
-            match self.definition {
-                Some(_) => "resolved",
-                None => "not resolved",
-            }
-        );
-
-        for x in &self.parameters {
-            println!("{}\tParameter: {}", prefix, x)
-        }
-    }
-}
+use l01::{Dumper, FunctionBody, FunctionCall, FunctionDecl, Prog, Statement};
 
 #[derive(new)]
 struct Parser {
@@ -395,7 +270,7 @@ impl Parser {
 struct RefResolver {}
 impl RefResolver {
     fn resolve(prog: &mut Prog) -> Result<(), String> {
-        let mut functions: HashMap<String, NonNull<FunctionDecl>> = HashMap::new();
+        let mut functions: HashMap<String, std::ptr::NonNull<FunctionDecl>> = HashMap::new();
 
         for x in &mut prog.stmts {
             match x {

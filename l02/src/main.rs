@@ -82,6 +82,8 @@ impl Tokenizer<'_> {
         }
         .peekable();
     }
+
+    #[allow(dead_code)]
     fn from_stream(stream: CharStream) -> Peekable<Tokenizer> {
         return Tokenizer { stream, eof: false }.peekable();
     }
@@ -197,12 +199,12 @@ impl Tokenizer<'_> {
                 if ch == '/' {}
 
                 // 无法识别，作为 identifier
-                panic!(format!(
+                panic!(
                     "Invalid token {} at {}:{}",
                     ch,
                     self.stream.line(),
                     self.stream.col()
-                ))
+                )
             }
         }
     }
@@ -330,8 +332,143 @@ impl Iterator for Tokenizer<'_> {
 }
 
 /////////////////////////////////////////////////////////////////////////
+// 语法分析
+// 包括了AST的数据结构和递归下降的语法解析程序
+
+use l01::{DecodeError, Dumper, FunctionBody, FunctionCall, FunctionDecl, Prog, Statement};
+
+struct Parser<'a> {
+    tokenizer: Peekable<Tokenizer<'a>>,
+}
+impl Parser<'_> {
+    fn new(tokenizer: Peekable<Tokenizer>) -> Parser {
+        Parser { tokenizer }
+    }
+    fn parse_prog(mut self) -> Result<Prog, String> {
+        let mut stmts: Vec<Statement> = Vec::new();
+
+        while let Some(token) = self.tokenizer.peek() {
+            if token.kind == TokenKind::EOF {
+                break;
+            };
+
+            if token.kind == TokenKind::Keyword && token.text == "function" {
+                stmts.push(Statement::FunctionDecl(self.parse_function_decl()?));
+                continue;
+            }
+            if token.kind == TokenKind::Identifier {
+                stmts.push(Statement::FunctionCall(self.parse_function_call()?));
+                continue;
+            }
+
+            return Err("unknown statement".into());
+        }
+
+        Ok(Prog::new(stmts))
+    }
+
+    // 解析函数声明
+    // 语法规则：
+    // functionDecl: "function" Identifier "(" ")"  functionBody;
+    fn parse_function_decl(&mut self) -> Result<FunctionDecl, String> {
+        self.tokenizer.next(); // Keyword "function"
+
+        let t = self.tokenizer.next().ok_or("invalid token".to_string())?; // Identifier
+        if t.kind != TokenKind::Identifier {
+            return Err(format!("expect Identifier but got {:?}", t));
+        }
+        let function_name = t.text.to_string();
+
+        // "(",
+        let t = self.tokenizer.next().ok_or("invalid token".to_string())?;
+        if t.kind != TokenKind::Seperator || t.text != "(" {
+            return Err(format!("expect Seperator '(' but got {:?}", t));
+        }
+        // 暂时不支持参数
+        // ")"
+        let t = self.tokenizer.next().ok_or("invalid token".to_string())?;
+        if t.kind != TokenKind::Seperator || t.text != ")" {
+            return Err(format!("expect Seperator ')' but got {:?}", t));
+        }
+
+        // 解析函数体
+        let function_body = self.parse_function_body()?;
+
+        // 解析成功
+        return Ok(FunctionDecl::new(function_name, function_body));
+    }
+
+    // 解析函数体
+    // 语法规则：
+    // functionBody : '{' functionCall* '}' ;
+    fn parse_function_body(&mut self) -> Result<FunctionBody, String> {
+        let t = self.tokenizer.next().ok_or("invalid token".to_string())?;
+        if t.kind != TokenKind::Seperator || t.text != "{" {
+            return Err(format!("expect Seperator '{}' but got {:?}", '{', t));
+        }
+
+        let mut stmts = Vec::new();
+        loop {
+            if let Some(token) = self.tokenizer.peek() {
+                if token.kind == TokenKind::Identifier {
+                    stmts.push(self.parse_function_call()?);
+                    continue;
+                }
+                if token.kind == TokenKind::Seperator && token.text == "}" {
+                    self.tokenizer.next();
+                    return Ok(FunctionBody::new(stmts));
+                }
+            }
+
+            return Err(format!("expect Seperator '{}' but got {:?}", '}', t).into());
+        }
+    }
+
+    // 解析函数调用
+    // functionCall : Identifier '(' parameter* ')' ;
+    fn parse_function_call(&mut self) -> Result<FunctionCall, String> {
+        let function_name = self.tokenizer.next().unwrap().text;
+
+        let t = self.tokenizer.next().ok_or("invalid token".to_string())?;
+        if t.kind != TokenKind::Seperator || t.text != "(" {
+            return Err(format!("expect Seperator '{}' but got {:?}", '(', t));
+        }
+
+        // function call
+        let mut function_parameters = Vec::new();
+        // parameter, parameter, ... )
+        let mut t = self.tokenizer.next().ok_or("invalid token".to_string())?;
+        while t.kind != TokenKind::Seperator || t.text != ")" {
+            // t should be StringLiteral
+            if t.kind != TokenKind::StringLiteral {
+                return Err(format!("expect string parameter '(' but got {:?}", t).into());
+            }
+            function_parameters.push(t.text.to_string());
+
+            // next should be Seperator, ',' or ')'
+            t = self.tokenizer.next().ok_or("invalid token".to_string())?;
+            if t.kind != TokenKind::Seperator || (t.text != "," && t.text != ")") {
+                return Err(format!("expect Seperator ',' or ')' but got {:?}", t).into());
+            }
+            if t.text == "," {
+                // simple skip
+                t = self.tokenizer.next().ok_or("invalid token".to_string())?;
+            }
+        }
+        // 末尾分号
+        let t = self.tokenizer.next().ok_or("invalid token".to_string())?;
+        if t.kind != TokenKind::Seperator || t.text != ";" {
+            return Err(format!("expect Seperator ';' but got {:?}", t).into());
+        }
+
+        // 解析成功
+        return Ok(FunctionCall::new(function_name, function_parameters));
+    }
+}
+
+/////////////////////////////////////////////////////////////////////////
 // 主程序
-fn compile_and_run(code: &str) -> Result<(), String> {
+fn compile_and_run(code: &str) {
     // 词法分析（模拟）
     let tokenizer = Tokenizer::new(code);
     {
@@ -342,11 +479,11 @@ fn compile_and_run(code: &str) -> Result<(), String> {
         }
     }
 
-    // // 语法分析
-    // let mut prog = Parser::new(tokenizer).parse_prog()?;
-    // println!("\n语法分析后的AST:");
-    // prog.dump("");
-    //
+    // 语法分析
+    let mut prog = Parser::new(tokenizer).parse_prog().unwrap();
+    println!("\n语法分析后的AST:");
+    prog.dump("");
+
     // // 语义分析
     // RefResolver::resolve(&mut prog)?;
     // println!("\n语义分析后的AST:");
@@ -355,12 +492,10 @@ fn compile_and_run(code: &str) -> Result<(), String> {
     // // 运行程序
     // println!("\n运行程序");
     // Interpreter::run(&prog)?;
-
-    Ok(())
 }
 
 const DEFAULT_CODE: &str = include_str!("default.ps");
 
-fn main() -> Result<(), String> {
+fn main() {
     compile_and_run(DEFAULT_CODE)
 }
