@@ -53,23 +53,7 @@ impl From<String> for DecodeError {
 // 本节没有提供词法分析器，直接提供了一个Token串。语法分析程序可以从Token串中依次读出
 // 一个个Token，也可以重新定位Token串的当前读取位置。
 
-#[derive(Debug, PartialEq, Eq)]
-#[allow(unused)]
-enum TokenKind {
-    Keyword,
-    Identifier,
-    StringLiteral,
-    Seperator,
-    Operator,
-    EOF,
-}
-
-// 代表一个Token的数据结构
-#[derive(Debug)]
-struct Token {
-    kind: TokenKind,
-    text: String,
-}
+use l01::{Token, TokenKind};
 
 struct Tokenizer {
     tokens: Vec<Token>,
